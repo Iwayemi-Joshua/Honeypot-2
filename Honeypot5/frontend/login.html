@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Login</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      height: 100vh;
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #0d2617, #1f6f43);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .login-container {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      padding: 2rem;
+      border-radius: 20px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+      backdrop-filter: blur(12px);
+      width: 320px;
+      text-align: center;
+      transform: translateY(100px);
+      opacity: 0;
+      animation: slideUpFade 1s ease-out forwards;
+    }
+
+    @keyframes slideUpFade {
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+
+    .login-container h2 {
+      color: #fff;
+      margin-bottom: 1.5rem;
+      font-weight: 600;
+    }
+
+    .login-container input {
+      width: 92%;
+      margin: 0.6rem 0;
+      padding: 0.7rem;
+      border: none;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+      font-size: 1rem;
+      transition: background 0.3s ease;
+    }
+
+    .login-container input::placeholder {
+      color: rgba(255, 255, 255, 0.6);
+    }
+
+    .login-container input:focus {
+      background: rgba(255, 255, 255, 0.2);
+      outline: none;
+    }
+
+    .login-container button {
+      width: 100%;
+      margin-top: 1rem;
+      padding: 0.7rem;
+      background: #1f6f43;
+      color: #fff;
+      font-size: 1rem;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+
+    .login-container button:hover {
+      background: #2da968;
+    }
+
+    .error-msg {
+      margin-top: 1rem;
+      color: #ff6961;
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <h2>Welcome Back</h2>
+    <input id="username" type="text" placeholder="Username" />
+    <input id="password" type="password" placeholder="Password" />
+    <button onclick="login()">Login</button>
+    <p id="msg" class="error-msg"></p>
+    <p style="text-align: center; margin-top: 10px;">
+      Don't have an account? <a href="register.html">Register here</a>
+    </p>
+
+  </div>
+
+  <script>
+    async function login() {
+      const username = document.getElementById("username").value;
+      const password = document.getElementById("password").value;
+
+      const res = await fetch("/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password })
+      });
+
+      const data = await res.json();
+      document.getElementById("msg").innerText = data.message;
+
+      if (res.status === 200) {
+        window.location.href = "/";
+      }
+    }
+  </script>
+</body>
+</html>

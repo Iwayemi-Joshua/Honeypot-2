@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Real-Time Honeypot Dashboard</title>
+    <link rel="stylesheet" href="style.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  </head>
+  <body>
+    <!-- Navbar -->
+    <header class="navbar">
+      <h1>🛡️ Honeypot Monitor</h1>
+      <span class="status">Status: <span class="online">Active</span></span>
+    </header>
+
+    <!-- Stats Cards -->
+    <section class="stats">
+      <div class="card">
+        <h3>Total Attacks</h3>
+        <p id="total-attacks">0</p>
+      </div>
+      <div class="card">
+        <h3>Unique IPs</h3>
+        <p id="unique-ips">0</p>
+      </div>
+      <div class="card">
+        <h3>Top Port</h3>
+        <p id="top-port">—</p>
+      </div>
+    </section>
+
+    <!-- Charts -->
+    <div class="charts">
+      <canvas id="barChart" width="400" height="350"></canvas>
+      <canvas id="pieChart" width="400" height="350"></canvas>
+    </div>
+
+    <!-- Clear Button -->
+    <div class="action-buttons">
+      <button id="clearLogsBtn" class="styled-button">🧹 Clear Logs</button>
+      <button onclick="logout()" class="styled-button">🚪 Logout</button>
+      <p id="clearStatus" style="color: #00e676; display: none">
+        Logs cleared successfully!
+      </p>
+    </div>
+
+    <!-- Live Table -->
+    <section class="table-section">
+      <h2>📝 Live Attack Logs</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Time</th>
+            <th>IP Address</th>
+            <th>Type</th>
+            <th>Port</th>
+            <th>Protocol</th>
+            <th>Status</th>
+            <th>Threat Level</th>
+            <!-- NEW -->
+          </tr>
+        </thead>
+        <tbody id="logs-body">
+          <tr>
+            <td colspan="7" style="text-align: center">Loading logs...</td>
+          </tr>
+        </tbody>
+      </table>
+      <div id="threat-level" class="threat-badge">Threat Level: Low</div>
+    </section>
+
+    <script>
+      let previousLogCount = 0;
+      let audioReady = false;
+
+      // Allow autoplay after first click
+      window.addEventListener("click", () => {
+        const audio = document.getElementById("notificationSound");
+        if (!audioReady && audio) {
+          audio
+            .play()
+            .then(() => {
+              audio.pause();
+              audio.currentTime = 0;
+              audioReady = true;
+              console.log("Sound ready");
+            })
+            .catch((err) => console.warn("Autoplay blocked:", err));
+        }
+      });
+
+      async function fetchLogs() {
+        const res = await fetch("/events");
+        const data = await res.json();
+        const logs = data.events || [];
+
+        const currentLogCount = logs.length;
+        if (currentLogCount > previousLogCount) {
+          const audio = document.getElementById("notificationSound");
+          if (audio && audioReady) {
+            audio.play().catch((err) => console.warn("Sound error:", err));
+          }
+        }
+        previousLogCount = currentLogCount;
+
+        const tbody = document.getElementById("logs-body");
+        tbody.innerHTML = logs
+          .slice(-20)
+          .reverse()
+          .map((e) => {
+            const ports = ["22", "80", "443", "8080"];
+            const protocols = ["TCP", "UDP", "ICMP"];
+            const statuses = ["Blocked", "Detected", "Dropped"];
+            const port = ports[e.id % ports.length];
+            const protocol = protocols[e.id % protocols.length];
+            const status = statuses[e.id % statuses.length];
+
+            let threatLevel = "Low";
+            let threatClass = "threat-low";
+
+            if (e.type === "SQL Injection" || e.type === "DDoS") {
+              threatLevel = "High";
+              threatClass = "threat-high";
+            } else if (e.type === "Brute Force") {
+              threatLevel = "Medium";
+              threatClass = "threat-medium";
+            }
+
+            return `
+            <tr>
+                <td>${e.id}</td>
+                <td>${e.timestamp}</td>
+                <td>${e.ip}</td>
+                <td>${e.type}</td>
+                <td>${port}</td>
+                <td>${protocol}</td>
+                <td>${status}</td>
+                <td><span class="${threatClass}">${threatLevel}</span></td>
+            </tr>`;
+          })
+          .join("");
+
+        document.getElementById("total-attacks").textContent = logs.length;
+        document.getElementById("unique-ips").textContent = new Set(
+          logs.map((e) => e.ip)
+        ).size;
+
+        const typeCounts = {};
+        logs.forEach((e) => {
+          typeCounts[e.type] = (typeCounts[e.type] || 0) + 1;
+        });
+        const topAttack = Object.entries(typeCounts).sort(
+          (a, b) => b[1] - a[1]
+        )[0];
+        document.getElementById("top-port").textContent = topAttack
+          ? topAttack[0]
+          : "—";
+      }
+
+      async function clearLogs() {
+        const res = await fetch("/api/clear-logs", { method: "POST" });
+        const result = await res.json();
+        if (result.status === "success") {
+          document.getElementById("clearStatus").style.display = "block";
+          setTimeout(() => {
+            document.getElementById("clearStatus").style.display = "none";
+          }, 3000);
+          fetchLogs();
+        }
+      }
+
+      function logout() {
+        fetch("/logout", { method: "POST" }).then(() => {
+          window.location.href = "/login.html";
+        });
+      }
+
+      document
+        .getElementById("clearLogsBtn")
+        .addEventListener("click", clearLogs);
+      fetchLogs();
+      setInterval(fetchLogs, 10000);
+
+      // THREAT LEVEL
+      const threatBadge = document.getElementById("threat-level");
+      let levelClass = "threat-low";
+      let levelText = "Low";
+
+      if (logs.length > 15) {
+        levelClass = "threat-high";
+        levelText = "High";
+      } else if (logs.length > 5) {
+        levelClass = "threat-medium";
+        levelText = "Medium";
+      }
+
+      threatBadge.textContent = `Threat Level: ${levelText}`;
+      threatBadge.className = `threat-badge ${levelClass}`;
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="charts.js" defer></script>
+
+    <audio
+      id="notificationSound"
+      src="https://notificationsounds.com/storage/sounds/file-sounds-1151-pristine.ogg"
+      preload="auto"
+    ></audio>
+  </body>
+</html>
